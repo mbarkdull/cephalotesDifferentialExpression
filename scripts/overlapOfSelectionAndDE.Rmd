@@ -126,162 +126,88 @@ We can compare our observed overlap to an expected overlap using a hypergeometri
 # m = number of differential genes in experiment 1
 # n = (total number of genes on platform - m)
 # k = number of differential genes in experiment 2. 
-pValuePositive <- phyper(deAndPositivePupal-1,
-                         positivePupal, 
-                         pupalCount - positivePupal, 
-                         dePupal, 
-                         lower.tail = FALSE, 
-                         log.p = FALSE) 
-pValueShift <- phyper(deAndShiftPupal-1,
-                      shiftPupal, 
-                      pupalCount - shiftPupal, 
-                      dePupal, 
-                      lower.tail = FALSE, 
-                      log.p = FALSE) 
+hypergeometricTest <- function(chosenContrast) {
+  # Get subsets of data for each DE contrast:
+  filteredContrast <- filter(allResultsCombined, 
+                             contrast == chosenContrast)
+  totalCount <- length(unique(filteredContrast$gene_name))
+  totalDE <- filter(filteredContrast, 
+                    padj <= 0.05)
+  totalDE <- length(unique(totalDE$gene_name))
+  totalPositive <- filter(filteredContrast, 
+                          testPvalueFDR <= 0.05 &
+                            backgroundPvalueFDR > 0.05 &
+                            differencePvalueFDR <= 0.05)
+  totalPositive <- length(unique(totalPositive$gene_name))
+  totalDEAndPositive <- filter(filteredContrast, 
+                               padj <= 0.05 &
+                                 testPvalueFDR <= 0.05 &
+                                 backgroundPvalueFDR > 0.05 &
+                                 differencePvalueFDR <= 0.05)
+  totalDEAndPositive <- length(unique(totalDEAndPositive$gene_name))
+  totalShift <- filter(filteredContrast, 
+                       pValueFDR <= 0.05)
+  totalShift <- length(unique(totalShift$gene_name))
+  totalDEAndShift <- filter(filteredContrast, 
+                            padj <= 0.05 &
+                              pValueFDR <= 0.05)
+  totalDEAndShift <- length(unique(totalDEAndShift$gene_name))
+  
+  # Compare overlaps with a hypergeometric test:
+  pValuePositive <- phyper(totalDEAndPositive-1,
+                           totalPositive, 
+                           totalCount - totalPositive, 
+                           totalDE, 
+                           lower.tail = FALSE, 
+                           log.p = FALSE) 
+  pValueShift <- phyper(totalDEAndShift-1,
+                        totalShift, 
+                        totalCount - totalShift, 
+                        totalDE, 
+                        lower.tail = FALSE, 
+                        log.p = FALSE) 
+  pValues <- c(pValuePositive,
+               pValueShift)
+  names(pValues) <- c("pValuePositive",
+                      "pValueShift")
+  return(pValues)
+}
+
+pupalPValues <- hypergeometricTest("Worker pupae vs. soldier pupae")
 
 ```
 
-When we do this, comparing differentially expressed genes and positively selected genes, we get a p-value of `r pValuePositive`, indicating that we `r base::ifelse(pValuePositive <= 0.05, "can reject the null hypothesis that the overlap is no more than expected.", "cannot reject the null hypothesis that the overlap is no more than expected.")`
+When we do this, comparing differentially expressed genes and positively selected genes, we get a p-value of `r pupalPValues[[1]]`, indicating that we `r base::ifelse(pupalPValues[[1]] <= 0.05, "can reject the null hypothesis that the overlap is no more than expected.", "cannot reject the null hypothesis that the overlap is no more than expected.")`
 
-If we compare differentially expressed genes and genes with a shift in the intensity of selection, we get a p-value of `r pValueShift`, indicating that we `r base::ifelse(pValueShift <= 0.05, "can reject the null hypothesis that the overlap is no more than expected.", "cannot reject the null hypothesis that the overlap is no more than expected.")`
+If we compare differentially expressed genes and genes with a shift in the intensity of selection, we get a p-value of `r pupalPValues[[2]]`, indicating that we `r base::ifelse(pupalPValues[[2]] <= 0.05, "can reject the null hypothesis that the overlap is no more than expected.", "cannot reject the null hypothesis that the overlap is no more than expected.")`
 
 ## Exploring adult differentially expressed genes 
 ```{r adultData, echo=FALSE, results=FALSE, message=FALSE, warning=FALSE}
-# Get subsets of data for each DE contrast:
-adult <- filter(allResultsCombined, 
-               contrast == "Adult workers vs. adult soldiers")
-adultCount <- length(unique(adult$gene_name))
-deAdult <- filter(adult, 
-                  padj <= 0.05)
-deAdult <- length(unique(deAdult$gene_name))
-positiveAdult <- filter(adult, 
-                        testPvalueFDR <= 0.05 &
-                          backgroundPvalueFDR > 0.05 &
-                          differencePvalueFDR <= 0.05)
-positiveAdult <- length(unique(positiveAdult$gene_name))
-deAndPositiveAdult <- filter(adult, 
-                             padj <= 0.05 &
-                               testPvalueFDR <= 0.05 &
-                               backgroundPvalueFDR > 0.05 &
-                               differencePvalueFDR <= 0.05)
-deAndPositiveAdult <- length(unique(deAndPositiveAdult$gene_name))
-shiftAdult <- filter(adult, 
-                        pValueFDR <= 0.05)
-shiftAdult <- length(unique(shiftAdult$gene_name))
-deAndShiftAdult <- filter(adult, 
-                             padj <= 0.05 &
-                               pValueFDR <= 0.05)
-deAndShiftAdult <- length(unique(deAndShiftAdult$gene_name))
+adultPValues <- hypergeometricTest("Adult workers vs. adult soldiers")
 
-# Compare overlaps with a hypergeometric test:
-pValuePositiveAdult <- phyper(deAndPositiveAdult-1,
-                              positiveAdult, 
-                              adultCount - positiveAdult, 
-                              deAdult, 
-                              lower.tail = FALSE, 
-                              log.p = FALSE) 
-pValueShiftAdult <- phyper(deAndShiftAdult-1,
-                           shiftAdult, 
-                           adultCount - shiftAdult, 
-                           deAdult, 
-                           lower.tail = FALSE, 
-                           log.p = FALSE) 
 ```
 
-When we explore genes that are differentially expressed between adult soldiers and adult workers, comparing them to positively selected genes, we get a p-value of `r pValuePositiveAdult`, indicating that we `r base::ifelse(pValuePositiveAdult <= 0.05, "can reject the null hypothesis that the overlap is no more than expected.", "cannot reject the null hypothesis that the overlap is no more than expected.")`
+When we explore genes that are differentially expressed between adult soldiers and adult workers, comparing them to positively selected genes, we get a p-value of `r adultPValues[[1]]`, indicating that we `r base::ifelse(adultPValues[[1]] <= 0.05, "can reject the null hypothesis that the overlap is no more than expected.", "cannot reject the null hypothesis that the overlap is no more than expected.")`
 
-If we compare differentially expressed genes and genes with a shift in the intensity of selection, we get a p-value of `r pValueShiftAdult`, indicating that we `r base::ifelse(pValueShiftAdult <= 0.05, "can reject the null hypothesis that the overlap is no more than expected.", "cannot reject the null hypothesis that the overlap is no more than expected.")`
+If we compare differentially expressed genes and genes with a shift in the intensity of selection, we get a p-value of `r adultPValues[[2]]`, indicating that we `r base::ifelse(adultPValues[[2]] <= 0.05, "can reject the null hypothesis that the overlap is no more than expected.", "cannot reject the null hypothesis that the overlap is no more than expected.")`
 
 ## Exploring genes that are differentially expressed across worker development:
 ```{r workerData, echo=FALSE, results=FALSE, message=FALSE, warning=FALSE}
 # Get subsets of data for each DE contrast:
-worker <- filter(allResultsCombined, 
-               contrast == "Adult workers vs. worker pupae")
-workerCount <- length(unique(worker$gene_name))
-deWorker <- filter(worker, 
-                  padj <= 0.05)
-deWorker <- length(unique(deWorker$gene_name))
-positiveWorker <- filter(worker, 
-                        testPvalueFDR <= 0.05 &
-                          backgroundPvalueFDR > 0.05 &
-                          differencePvalueFDR <= 0.05)
-positiveWorker <- length(unique(positiveWorker$gene_name))
-deAndPositiveWorker <- filter(worker, 
-                             padj <= 0.05 &
-                               testPvalueFDR <= 0.05 &
-                               backgroundPvalueFDR > 0.05 &
-                               differencePvalueFDR <= 0.05)
-deAndPositiveWorker <- length(unique(deAndPositiveWorker$gene_name))
-shiftWorker <- filter(worker, 
-                        pValueFDR <= 0.05)
-shiftWorker <- length(unique(shiftWorker$gene_name))
-deAndShiftWorker <- filter(worker, 
-                             padj <= 0.05 &
-                               pValueFDR <= 0.05)
-deAndShiftWorker <- length(unique(deAndShiftWorker$gene_name))
+workerPValues <- hypergeometricTest("Adult workers vs. worker pupae")
 
-# Compare overlaps with a hypergeometric test:
-pValuePositiveWorker <- phyper(deAndPositiveWorker-1,
-                              positiveWorker, 
-                              workerCount - positiveWorker, 
-                              deWorker, 
-                              lower.tail = FALSE, 
-                              log.p = FALSE) 
-pValueShiftWorker <- phyper(deAndShiftWorker-1,
-                           shiftWorker, 
-                           workerCount - shiftWorker, 
-                           deWorker, 
-                           lower.tail = FALSE, 
-                           log.p = FALSE) 
 ```
 
-When we explore genes that are differentially expressed between pupal workers and adult workers, comparing them to positively selected genes, we get a p-value of `r pValuePositiveWorker`, indicating that we `r base::ifelse(pValuePositiveWorker <= 0.05, "can reject the null hypothesis that the overlap is no more than expected.", "cannot reject the null hypothesis that the overlap is no more than expected.")`
+When we explore genes that are differentially expressed between pupal workers and adult workers, comparing them to positively selected genes, we get a p-value of `r workerPValues[[1]]`, indicating that we `r base::ifelse(workerPValues[[1]] <= 0.05, "can reject the null hypothesis that the overlap is no more than expected.", "cannot reject the null hypothesis that the overlap is no more than expected.")`
 
-If we compare differentially expressed genes and genes with a shift in the intensity of selection, we get a p-value of `r pValueShiftWorker`, indicating that we `r base::ifelse(pValueShiftWorker <= 0.05, "can reject the null hypothesis that the overlap is no more than expected.", "cannot reject the null hypothesis that the overlap is no more than expected.")`
+If we compare differentially expressed genes and genes with a shift in the intensity of selection, we get a p-value of `r workerPValues[[2]]`, indicating that we `r base::ifelse(workerPValues[[2]] <= 0.05, "can reject the null hypothesis that the overlap is no more than expected.", "cannot reject the null hypothesis that the overlap is no more than expected.")`
 
 ## Exploring genes that are differentially expressed across soldier development:
 ```{r soldierData, echo=FALSE, results=FALSE, message=FALSE, warning=FALSE}
-# Get subsets of data for each DE contrast:
-soldier <- filter(allResultsCombined, 
-               contrast == "Adult soldiers vs. soldier pupae")
-soldierCount <- length(unique(soldier$gene_name))
-deSoldier <- filter(soldier, 
-                  padj <= 0.05)
-deSoldier <- length(unique(deSoldier$gene_name))
-positiveSoldier <- filter(soldier, 
-                        testPvalueFDR <= 0.05 &
-                          backgroundPvalueFDR > 0.05 &
-                          differencePvalueFDR <= 0.05)
-positiveSoldier <- length(unique(positiveSoldier$gene_name))
-deAndPositiveSoldier <- filter(soldier, 
-                             padj <= 0.05 &
-                               testPvalueFDR <= 0.05 &
-                               backgroundPvalueFDR > 0.05 &
-                               differencePvalueFDR <= 0.05)
-deAndPositiveSoldier <- length(unique(deAndPositiveSoldier$gene_name))
-shiftSoldier <- filter(soldier, 
-                        pValueFDR <= 0.05)
-shiftSoldier <- length(unique(shiftSoldier$gene_name))
-deAndShiftSoldier <- filter(soldier, 
-                             padj <= 0.05 &
-                               pValueFDR <= 0.05)
-deAndShiftSoldier <- length(unique(deAndShiftSoldier$gene_name))
+soldierPValues <- hypergeometricTest("Adult soldiers vs. soldier pupae")
 
-# Compare overlaps with a hypergeometric test:
-pValuePositiveSoldier <- phyper(deAndPositiveSoldier-1,
-                              positiveSoldier, 
-                              soldierCount - positiveSoldier, 
-                              deSoldier, 
-                              lower.tail = FALSE, 
-                              log.p = FALSE) 
-pValueShiftSoldier <- phyper(deAndShiftSoldier-1,
-                             shiftSoldier, 
-                           soldierCount - shiftSoldier, 
-                           deSoldier, 
-                           lower.tail = FALSE, 
-                           log.p = FALSE) 
 ```
 
-When we explore genes that are differentially expressed between pupal soldiers and adult soldiers, comparing them to positively selected genes, we get a p-value of `r pValuePositiveSoldier`, indicating that we `r base::ifelse(pValuePositiveSoldier <= 0.05, "can reject the null hypothesis that the overlap is no more than expected.", "cannot reject the null hypothesis that the overlap is no more than expected.")`
+When we explore genes that are differentially expressed between pupal soldiers and adult soldiers, comparing them to positively selected genes, we get a p-value of `r soldierPValues[[1]]`, indicating that we `r base::ifelse(soldierPValues[[1]] <= 0.05, "can reject the null hypothesis that the overlap is no more than expected.", "cannot reject the null hypothesis that the overlap is no more than expected.")`
 
-If we compare differentially expressed genes and genes with a shift in the intensity of selection, we get a p-value of `r pValueShiftSoldier`, indicating that we `r base::ifelse(pValueShiftSoldier <= 0.05, "can reject the null hypothesis that the overlap is no more than expected.", "cannot reject the null hypothesis that the overlap is no more than expected.")`
+If we compare differentially expressed genes and genes with a shift in the intensity of selection, we get a p-value of `r soldierPValues[[2]]`, indicating that we `r base::ifelse(soldierPValues[[2]] <= 0.05, "can reject the null hypothesis that the overlap is no more than expected.", "cannot reject the null hypothesis that the overlap is no more than expected.")`
