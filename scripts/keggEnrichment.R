@@ -75,8 +75,10 @@ testKEGGenrichment <- function(selectedContrast) {
                                 use_internal_data = FALSE)
   
   #save the enrichment result
+  dir.create("./finalResults/")
   contrast <- snakecase::to_upper_camel_case(selectedContrast)
-  resultsFile <- paste(contrast,
+  resultsFile <- paste("./finalResults/",
+                       contrast,
                        "_EnrichmentKEGGResults.csv",
                        sep = "")
   write.csv(file = resultsFile,                 
@@ -173,7 +175,8 @@ makePlotsConsistent(allKEGGplots) +
   patchwork::plot_layout(guides = "collect",
                          axes = "collect")
 
-ggsave(filename = "allKEGGresults.png",
+dir.create("./images/")
+ggsave(filename = "./images/allKEGGresults.png",
        width = 16, 
        height = 10, 
        units = "in")
