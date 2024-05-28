@@ -44,7 +44,7 @@ testKEGGenrichment <- function(selectedContrast) {
                   "gene")
   
   #### Select just our genes of interest (i.e. differentially expressed genes:) ####
-  pupalDEGenes <- read_csv(file = "allDifferentialExpressionResultsAndFunctions.csv") %>%
+  pupalDEGenes <- read_csv(file = "./finalResults/allDifferentialExpressionResultsAndFunctions.csv") %>%
     filter(contrast == selectedContrast) %>%
     filter(padj <= 0.05)
   pupalDEGenes <- unique(pupalDEGenes$gene_name)
@@ -118,7 +118,7 @@ possiblyTestKEGGenrichment <- possibly(testKEGGenrichment,
                                        otherwise = "Error.")
 
 # List all the contrasts 
-contrasts <- read_csv(file = "allDifferentialExpressionResultsAndFunctions.csv")
+contrasts <- read_csv(file = "./finalResults/allDifferentialExpressionResultsAndFunctions.csv")
 contrasts <- unique(contrasts$contrast)
 contrasts <- contrasts[!is.na(contrasts)]
 
