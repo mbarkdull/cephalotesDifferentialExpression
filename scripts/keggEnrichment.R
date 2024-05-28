@@ -8,7 +8,7 @@ library(snakecase)
 # Write a function to do KEGG enrichment for a selected differential expression contrast:
 testKEGGenrichment <- function(selectedContrast) {
   #### Read in all of our genes and their KEGG annotations (from eggnog-mapper): ####
-  keggAnnotations <- read_delim("keggAnnotations.emapper.annotations",
+  keggAnnotations <- read_delim("./04_keggAnnotations/results/keggAnnotations.emapper.annotations",
                                 delim = "\t",
                                 skip = 4) %>%
     filter(!is.na(seed_ortholog))

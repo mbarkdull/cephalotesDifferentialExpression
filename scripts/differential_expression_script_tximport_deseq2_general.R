@@ -263,7 +263,7 @@ allResultsForExport <- rbind(pupaResultsFunctions,
 
 # Export the results as a .csv:
 write_csv(allResultsForExport,
-          file = "allDifferentialExpressionResultsAndFunctions.csv")
+          file = "./finalResults/allDifferentialExpressionResultsAndFunctions.csv")
 
 
 
@@ -289,7 +289,7 @@ differentialExpression <- DESeq(dataForDESeq)
 
 #### Generate dot plots for individual genes as a sanity check ####
 plotCounts(pairwiseAnalysis,
-           gene = "CVAR_08634",
+           gene = "CVAR_01260",
            intgroup = c("group"))
 
 #### Run a PCA of the samples ####

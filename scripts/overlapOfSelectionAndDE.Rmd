@@ -69,7 +69,7 @@ hyphyResults <- full_join(hyphyResults,
            !is.na(inputFile.y))
 
 # Read in the differential expression results:
-differentialExpression <- read_csv(file = "../allDifferentialExpressionResultsAndFunctions.csv")
+differentialExpression <- read_csv(file = "../finalResults/allDifferentialExpressionResultsAndFunctions.csv")
 
 # Combine with the Hyphy results:
 allResultsCombined <- full_join(hyphyResults,
