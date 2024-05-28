@@ -1,0 +1,16 @@
+#!/bin/bash
+
+# Add eggnog-mapper to the path:
+export PYTHONPATH=/programs/eggnog-mapper-2.1.12/lib64/python3.9/site-packages:/programs/eggnog-mapper-2.1.12/lib/python3.9/site-packages
+export PATH=/programs/eggnog-mapper-2.1.12/bin:$PATH
+
+# Make a directory for the KEGG data and for our results:
+mkdir ./keggAnnotations
+mkdir ./keggAnnotations/data/
+mkdir ./keggAnnotations/results/
+
+# Download the necessary data (e.g. kegg databases):
+/programs/eggnog-mapper-2.1.12/bin/download_eggnog_data.py --data_dir ./keggAnnotations/data/
+
+# Run eggnog-mapper on the Cephalotes varians proteins:
+emapper.py -i CVAR_OGS_v1.0_pep.fasta -o keggAnnotations --data_dir ./keggAnnotations/data/ --output_dir ./keggAnnotations/results/ --cpu 0 --itype proteins
