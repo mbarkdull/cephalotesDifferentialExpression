@@ -1,0 +1,48 @@
+#!/bin/bash
+
+# Make working directory:
+mkdir ./03_Orthofinder
+mkdir ./03_Orthofinder/fasta
+
+# Download other proteomes:
+wget https://ftp.ncbi.nlm.nih.gov/genomes/all/GCF/001/594/045/GCF_001594045.1_Acol1.0/GCF_001594045.1_Acol1.0_protein.faa.gz
+gunzip GCF_001594045.1_Acol1.0_protein.faa.gz
+mv ./GCF_001594045.1_Acol1.0_protein.faa ./03_Orthofinder/fasta/acol_proteins.fasta
+
+wget https://ftp.ncbi.nlm.nih.gov/genomes/all/GCF/000/143/395/GCF_000143395.1_Attacep1.0/GCF_000143395.1_Attacep1.0_protein.faa.gz
+gunzip GCF_000143395.1_Attacep1.0_protein.faa.gz
+mv ./GCF_000143395.1_Attacep1.0_protein.faa ./03_Orthofinder/fasta/acep_proteins.fasta
+
+wget https://ftp.ncbi.nlm.nih.gov/genomes/all/GCF/001/594/115/GCF_001594115.1_Tsep1.0/GCF_001594115.1_Tsep1.0_protein.faa.gz
+gunzip GCF_001594115.1_Tsep1.0_protein.faa.gz
+mv ./GCF_001594115.1_Tsep1.0_protein.faa ./03_Orthofinder/fasta/tsep_proteins.fasta
+
+wget https://ftp.ncbi.nlm.nih.gov/genomes/all/GCF/013/373/865/GCF_013373865.1_ASM1337386v2/GCF_013373865.1_ASM1337386v2_protein.faa.gz
+gunzip GCF_013373865.1_ASM1337386v2_protein.faa.gz
+mv GCF_013373865.1_ASM1337386v2_protein.faa ./03_Orthofinder/fasta/mpha_proteins.fasta
+
+wget https://ftp.ncbi.nlm.nih.gov/genomes/all/GCF/003/254/395/GCF_003254395.2_Amel_HAv3.1/GCF_003254395.2_Amel_HAv3.1_protein.faa.gz
+gunzip GCF_003254395.2_Amel_HAv3.1_protein.faa.gz
+mv ./GCF_003254395.2_Amel_HAv3.1_protein.faa ./03_Orthofinder/fasta/amel_proteins.fasta
+
+wget https://ftp.ncbi.nlm.nih.gov/genomes/all/GCF/000/001/215/GCF_000001215.4_Release_6_plus_ISO1_MT/GCF_000001215.4_Release_6_plus_ISO1_MT_protein.faa.gz
+gunzip GCF_000001215.4_Release_6_plus_ISO1_MT_protein.faa.gz
+mv ./GCF_000001215.4_Release_6_plus_ISO1_MT_protein.faa ./03_Orthofinder/fasta/dmel_proteins.fasta
+
+wget https://ftp.ncbi.nlm.nih.gov/genomes/all/GCF/031/307/605/GCF_031307605.1_icTriCast1.1/GCF_031307605.1_icTriCast1.1_protein.faa.gz
+gunzip GCF_031307605.1_icTriCast1.1_protein.faa.gz
+mv ./GCF_031307605.1_icTriCast1.1_protein.faa ./03_Orthofinder/fasta/tcas_proteins.fasta
+
+# Get the Cephalotes varians proteome:
+cp /home/mb2337/Megan/Chapter2/CVAR/CVAR_OGS_v1.0_pep.fasta ./03_Orthofinder/fasta/cvar_proteins.fasta
+
+# Run orthofinder:
+source /programs/miniconda3/bin/activate orthofinder-2.5.4
+# Options:
+  # -S: sequence search option; here using diamond.
+  # -t: number of threads for upstream processes
+  # -f: directory with input data
+  # -d: run on nucleotide sequences rather than amino acid sequences
+  # -M: infer multiple sequence aligments and gene trees.
+#orthofinder -S diamond -t $1 -f ./03_Orthofinder/fasta/ -M msa
+orthofinder -S diamond -t 60 -f ./03_Orthofinder/fasta/ -M msa
