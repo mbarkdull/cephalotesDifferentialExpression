@@ -28,26 +28,26 @@ for files in ${raw_reads_directory} do
 #	fastqc -o ./02_alignments/fastqc/ ${samplename}
 
 	#Run STAR
-#	echo "Starting STAR for $samplename"
-#	STAR --runThreadN $cores --genomeDir $genome --readFilesIn ./raw_data/fastq/${samplename}/${samplename}_1.*.gz ./raw_data/fastq/${samplename}/${samplename}_2.*.gz --readFilesCommand zcat --outFileNamePrefix ${samplename} --outSAMtype BAM SortedByCoordinate --outSAMunmapped Within --outSAMattributes Standard
+	echo "Starting STAR for $samplename"
+	STAR --runThreadN $cores --genomeDir $genome --readFilesIn ./raw_data/fastq/${samplename}/${samplename}_1.*.gz ./raw_data/fastq/${samplename}/${samplename}_2.*.gz --readFilesCommand zcat --outFileNamePrefix ${samplename} --outSAMtype BAM SortedByCoordinate --outSAMunmapped Within --outSAMattributes Standard
 
 	#Run Qualimap
-#	echo "Starting Qualimap for $samplename"
-#	/programs/qualimap_v2.2.1/qualimap rnaseq \
-#	-outdir ./02_alignments/qualimap/ \
-#	-a proportional \
-#	-bam ./02_alignments/STAR/${samplename}.bam \
-#	-gtf $gtf \
-#	--java-mem-size=8G
+	echo "Starting Qualimap for $samplename"
+	/programs/qualimap_v2.2.1/qualimap rnaseq \
+	-outdir ./02_alignments/qualimap/ \
+	-a proportional \
+	-bam ./02_alignments/STAR/${samplename}.bam \
+	-gtf $gtf \
+	--java-mem-size=8G
 
 	#Run salmon
-#	echo "Starting Salmon run for $samplename"
-#	salmon quant -i $transcriptome \
-#	-p $cores \
-#	-l A \
-#	-1 ./raw_data/fastq/${samplename}/${samplename}_1.*.gz \
-#	-2 ./raw_data/fastq/${samplename}/${samplename}_2.*.gz \
-#	-o ./02_alignments/salmon/ \
-#	--seqBias \
-#	--useVBOpt
+	echo "Starting Salmon run for $samplename"
+	salmon quant -i $transcriptome \
+	-p $cores \
+	-l A \
+	-1 ./raw_data/fastq/${samplename}/${samplename}_1.*.gz \
+	-2 ./raw_data/fastq/${samplename}/${samplename}_2.*.gz \
+	-o ./02_alignments/salmon/ \
+	--seqBias \
+	--useVBOpt
 done
