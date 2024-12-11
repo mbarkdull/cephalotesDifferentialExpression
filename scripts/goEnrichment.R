@@ -11,7 +11,7 @@ eggnogAnnotations <- read_delim("./04_keggAnnotations/results/keggAnnotations.em
   filter(!is.na(seed_ortholog))
 
 # Subset so we just have gene name and GO domain IDs:
-longAnnotations <- dplyr::select(keggAnnotations,
+longAnnotations <- dplyr::select(eggnogAnnotations,
                                  c("#query", "GOs"))
 
 # Reshape into a long dataframe:
@@ -57,7 +57,7 @@ goTermsByContrast <- function(selectedContrast) {
     enrichedGOTerms$ratio <- enrichedGOTerms$Significant/enrichedGOTerms$Annotated
     enrichedGOTerms$raw.p.value <- as.numeric(enrichedGOTerms$raw.p.value)
     
-    dotPlot <- ggplot(data = enrichedGOTerms) + 
+    fullDotPlot <- ggplot(data = enrichedGOTerms) + 
       geom_point(mapping = aes(x = ratio, 
                                y = fct_reorder(Term, 
                                                ratio),
@@ -75,6 +75,30 @@ goTermsByContrast <- function(selectedContrast) {
              size = guide_legend(order = 2)) +
       labs(color = "p-value (FDR-adjusted)",
            size = "Ratio of enrichment")
+    
+    selectedEnrichedGOTerms <- enrichedGOTerms %>%
+      dplyr::arrange(`raw.p.value`) %>%
+      head(n = 15)
+    
+    dotPlot <- ggplot(data = selectedEnrichedGOTerms) + 
+      geom_point(mapping = aes(x = ratio, 
+                               y = fct_reorder(Term, 
+                                               ratio),
+                               size = ratio, 
+                               color = `raw.p.value`)) +
+      theme_bw(base_size = 12) +
+      scale_color_gradient2(high = "#F1A208", 
+                            mid = "#3e8a04") +
+      guides(colour = guide_colorbar(reverse = T)) +
+      ylab(NULL) +
+      xlab("Ratio of enrichment") +
+      ggtitle(selectedContrast) +
+      theme(axis.text = element_text(color = "black")) + 
+      guides(colour = guide_colourbar(order = 1), 
+             size = guide_legend(order = 2)) +
+      labs(color = "p-value (FDR-adjusted)",
+           size = "Ratio of enrichment")
+    
     return(dotPlot)
   } else {
     # Get significance info from the differential expression results:
@@ -158,7 +182,7 @@ goTermsByContrast <- function(selectedContrast) {
     enrichedGOTerms$ratio <- enrichedGOTerms$Significant/enrichedGOTerms$Annotated
     enrichedGOTerms$raw.p.value <- as.numeric(enrichedGOTerms$raw.p.value)
     
-    dotPlot <- ggplot(data = enrichedGOTerms) + 
+    fullDotPlot <- ggplot(data = enrichedGOTerms) + 
       geom_point(mapping = aes(x = ratio, 
                                y = fct_reorder(Term, 
                                                ratio),
@@ -176,6 +200,30 @@ goTermsByContrast <- function(selectedContrast) {
              size = guide_legend(order = 2)) +
       labs(color = "p-value (FDR-adjusted)",
            size = "Ratio of enrichment")
+    
+    selectedEnrichedGOTerms <- enrichedGOTerms %>%
+      dplyr::arrange(`raw.p.value`) %>%
+      head(n = 15)
+    
+    dotPlot <- ggplot(data = selectedEnrichedGOTerms) + 
+      geom_point(mapping = aes(x = ratio, 
+                               y = fct_reorder(Term, 
+                                               ratio),
+                               size = ratio, 
+                               color = `raw.p.value`)) +
+      theme_bw(base_size = 12) +
+      scale_color_gradient2(high = "#F1A208", 
+                            mid = "#3e8a04") +
+      guides(colour = guide_colorbar(reverse = T)) +
+      ylab(NULL) +
+      xlab("Ratio of enrichment") +
+      ggtitle(selectedContrast) +
+      theme(axis.text = element_text(color = "black")) + 
+      guides(colour = guide_colourbar(order = 1), 
+             size = guide_legend(order = 2)) +
+      labs(color = "p-value (FDR-adjusted)",
+           size = "Ratio of enrichment")
+    
     return(dotPlot)
   }
 }
@@ -225,26 +273,65 @@ makePlotsConsistent <- function(plot){
   plot & 
     xlim(minX - 0.01, 
          maxX + 0.01) & 
-    scale_color_gradient(high = "#F1A208", 
+    scale_color_gradient2(high = "#F1A208", 
+                         mid = "#e8dfa5",
                          low = "#3e8a04",
                          limits = c(colorMins, 
-                                    colorMaxs)) & 
+                                    colorMaxs),
+                         midpoint = (colorMins + colorMaxs)/2) & 
     scale_size(limits = c(minX,
                           maxX)) 
 }
 
 # Plot all results with consistent scales and a single legend:
-makePlotsConsistent(allGOplots) + 
+goPlotsList <- makePlotsConsistent(allGOplots) + 
   patchwork::plot_layout(guides = "collect",
-                         axes = "collect")
+                         axes = "collect") 
+
+goPlotsList
 
 dir.create("./images/")
 ggsave(filename = "./images/allGOresults.png",
-       width = 20, 
-       height = 20, 
-       units = "in")
+       width = 18, 
+       height = 10, 
+       units = "in",
+       dpi = 900)
+
+# Read in all of the GO term enrichment results as dataframes for ease of viewing:
+goTermFiles <- list.files(path = "./finalResults",
+                          pattern = "*_EnrichmentGOResults.tsv",
+                          full.names = TRUE)
+
+goTermResults <- read_tsv(goTermFiles,
+                          id = "contrast") 
+goTermResults$contrast <- str_split_i(goTermResults$contrast,
+                                      pattern = "/",
+                                      i = 3)
+goTermResults$contrast <- str_split_i(goTermResults$contrast,
+                                      pattern = "_",
+                                      i = 1)
+
+goTermResults$contrast <- gsub("([a-z])([A-Z])", 
+                               "\\1 \\L\\2", 
+                               goTermResults$contrast, 
+                               perl = TRUE)
+
+goTermResultsTable <- goTermResults %>%
+  dplyr::select("contrast",
+                "GO.ID",
+                "Term",
+                "Annotated",
+                "Significant",
+                "raw.p.value") %>%
+  gt::gt()
+gtsave(goTermResultsTable, 
+       "allGOTerms.docx")
 
 
+numberPupae <- length(which(goTermResults$contrast == "./finalResults/WorkerPupaeVsSoldierPupae_EnrichmentGOResults.tsv"))
+numberAdults <- length(which(goTermResults$contrast == "./finalResults/AdultWorkersVsAdultSoldiers_EnrichmentGOResults.tsv"))
+numberSoldiers <- length(which(goTermResults$contrast == "./finalResults/AdultSoldiersVsSoldierPupae_EnrichmentGOResults.tsv"))
+numberWorkers <- length(which(goTermResults$contrast == "./finalResults/AdultWorkersVsWorkerPupae_EnrichmentGOResults.tsv"))
 
 
 
