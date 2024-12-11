@@ -1,6 +1,7 @@
 library(ggplot2)
 library(ComplexUpset)
 library(gt)
+library(tidyverse)
 
 #### Read in and combine the HYPHY results: ####
 hyphyResults <- read_tsv("./hyphyResultsForDE.tsv")
@@ -51,7 +52,7 @@ generateUpsets <- function(specificContrast) {
     mutate(`Relaxed selection` = case_when(kValue < 1 &      
                                              pValueFDR < 0.05 ~ TRUE,
                                            TRUE ~ FALSE)) %>%
-    select(c("gene_name",
+    dplyr::select(c("gene_name",
              "Upregulated",  
              "Downregulated",
              "Positive selection",
@@ -60,7 +61,7 @@ generateUpsets <- function(specificContrast) {
     distinct()
   rownames(upsetInputData) <- upsetInputData$gene_name
   upsetInputData <- upsetInputData %>%
-    select(-c("gene_name"))
+    dplyr::select(-c("gene_name"))
   
   categories <- c("Upregulated",  
                   "Downregulated",
@@ -68,18 +69,20 @@ generateUpsets <- function(specificContrast) {
                   "Intensified selection",
                   "Relaxed selection")
   
+  theme_border <- theme_gray() + 
+    theme(plot.background = element_rect(fill = NA, 
+                                         colour = 'grey', 
+                                         size = 1))
+  
   hyphyAndDEUpset <- upset(upsetInputData, 
                            categories,
                            width_ratio = 0.2,
                            max_degree = 2,
                            mode = "inclusive_intersection",
-                           intersections = list('Positive selection',
-                                                c('Downregulated', 'Positive selection'),
+                           intersections = list(c('Downregulated', 'Positive selection'),
                                                 c('Upregulated', 'Positive selection'),
-                                                'Relaxed selection',
                                                 c('Downregulated', 'Relaxed selection'),
                                                 c('Upregulated', 'Relaxed selection'),
-                                                'Intensified selection',
                                                 c('Downregulated', 'Intensified selection'),
                                                 c('Upregulated', 'Intensified selection')),
                            sort_intersections = FALSE,
@@ -94,10 +97,6 @@ generateUpsets <- function(specificContrast) {
                                                       color = '#bed0a5',
                                                       fill = '#bed0a5',
                                                       only_components = c('intersections_matrix', 'Intersection size')),
-                                          upset_query(intersect=c('Positive selection'),
-                                                      color = '#bed0a5',
-                                                      fill = '#bed0a5',
-                                                      only_components = c('intersections_matrix', 'Intersection size')),
                                           upset_query(intersect=c('Downregulated', 
                                                                   'Intensified selection'),
                                                       color = '#05a77d',
@@ -108,10 +107,6 @@ generateUpsets <- function(specificContrast) {
                                                       color = '#05a77d',
                                                       fill = '#05a77d',
                                                       only_components = c('intersections_matrix', 'Intersection size')),
-                                          upset_query(intersect=c('Intensified selection'),
-                                                      color = '#05a77d',
-                                                      fill = '#05a77d',
-                                                      only_components = c('intersections_matrix', 'Intersection size')),
                                           upset_query(intersect=c('Downregulated', 
                                                                   'Relaxed selection'),
                                                       color = '#c5e8a8',
@@ -119,10 +114,6 @@ generateUpsets <- function(specificContrast) {
                                                       only_components = c('intersections_matrix', 'Intersection size')),
                                           upset_query(intersect=c('Upregulated', 
                                                                   'Relaxed selection'),
-                                                      color = '#c5e8a8',
-                                                      fill = '#c5e8a8',
-                                                      only_components = c('intersections_matrix', 'Intersection size')),
-                                          upset_query(intersect=c('Relaxed selection'),
                                                       color = '#c5e8a8',
                                                       fill = '#c5e8a8',
                                                       only_components = c('intersections_matrix', 'Intersection size')),
@@ -140,17 +131,22 @@ generateUpsets <- function(specificContrast) {
                                                              'Upregulated' = upregulatedExpression,
                                                              "Relaxed selection" = "Relaxed selection",
                                                              "Intensified selection" = "Intensified selection",
-                                                             "Positive selection" = "Positive selection"))) 
+                                                             "Positive selection" = "Positive selection")),
+                           set_sizes = (upset_set_size() + 
+                                          theme(axis.text.x = element_text(angle = 45)))) + 
+    patchwork::plot_annotation(theme = theme_border)
   
   # Changing text colors doesn't work for one of the plots, but for future reference, the code is here:
   #,
   #base_annotations = list('Intersection size' = intersection_size(text_colors = c(on_background = 'black', 
                                                                                   #on_bar = 'black')))
   
+  
   plot <- plot(hyphyAndDEUpset) +
-    ggtitle(specificContrast)+
-    theme(plot.title = element_text(size = 20, 
-                                    hjust = 0.5))
+    ggtitle(specificContrast) +
+    theme(plot.title = element_text(size = 10, 
+                                    hjust = 0.5)) 
+
   plot
   
   return(plot)
@@ -165,10 +161,15 @@ contrasts <- unique(allResultsCombined$contrast) %>%
 allPlots <- purrr::map(contrasts,
                        possiblyGenerateUpsets)
 
-hyphyAndDEUpset <- patchwork::wrap_plots(allPlots, 
-                                         ncol = 2) + 
-  patchwork::plot_annotation(title = 'Overlap of genes under selection and differentially expressed genes',
-                             theme = theme(plot.title = element_text(size = 19))) 
+
+hyphyAndDEUpset <- cowplot::plot_grid(allPlots[[1]], allPlots[[2]], allPlots[[3]], allPlots[[4]],
+                                      ncol = 2,
+                                      scale = 0.9,
+                                      labels = c('A.', 'B.', 'C.', 'D.'), 
+                                      label_size = 14,
+                                      label_x = 0.05,
+                                      label_y = 0.95)
+
 hyphyAndDEUpset
 
 ggsave(filename = "./images/upsetPlot.png",
@@ -177,6 +178,23 @@ ggsave(filename = "./images/upsetPlot.png",
        width = 16,
        units = "in",
        dpi = 600)
+
+morphConstrasts <- cowplot::plot_grid(allPlots[[1]], allPlots[[2]],
+                                      ncol = 2,
+                                      scale = 0.9,
+                                      labels = c('A.', 'B.'), 
+                                      label_size = 14,
+                                      label_x = 0.05,
+                                      label_y = 0.95)
+
+morphConstrasts
+
+ggsave(filename = "./images/upsetPlotMorphConstrastsOnly.png",
+       plot = morphConstrasts,
+       height = 15, 
+       width = 35,
+       units = "cm",
+       dpi = 1800)
 
 #### Do hypergeometric tests: ####
 
