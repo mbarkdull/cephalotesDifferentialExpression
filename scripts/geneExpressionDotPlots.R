@@ -4,7 +4,6 @@ library(googlesheets4)
 library(splitstackshape)
 
 #### Plot contrast-vs-contrast as suggested by Mike ####
-
 # Prep the differential expression data:
 differentialExpression <- read_csv(file = "./finalResults/allDifferentialExpressionResultsAndFunctions.csv") %>%
   dplyr::select(c(gene_name, log2FoldChange, padj, contrast)) %>%
