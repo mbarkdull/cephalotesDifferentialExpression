@@ -103,8 +103,7 @@ withinLifeStage <- ggplot(data = differentialExpression) +
   theme_bw() +
   theme(axis.title = element_text(size = 8),
         legend.title = element_text(size = 8)) + 
-  labs(fill = 'Signficant in at\nleast one of the\ntwo contrasts?',
-       color = 'Gene in the\nHippo pathway') 
+  labs(color = 'Signficant in at\nleast one of the\ntwo contrasts?') 
 
 withinLifeStage
 
@@ -134,7 +133,7 @@ withinACaste <- ggplot(data = differentialExpression) +
   theme_bw() +
   theme(axis.title = element_text(size = 8),
         legend.title = element_text(size = 8)) + 
-  labs(fill = 'Signficant in at\nleast one of the\ntwo contrasts?') 
+  labs(color = 'Signficant in at\nleast one of the\ntwo contrasts?') 
 
 withinACaste
 
@@ -150,9 +149,9 @@ correlationLegend <- ggpubr::get_legend(withinLifeStage) %>%
 # Plot only the correlation plots:
 (withinACaste &
     theme(legend.position = "none",
-          plot.margin = unit(c(0, 30, 0, 0), "pt")) | withinLifeStage &
+          plot.margin = unit(c(0, 15, 0, 0), "pt")) | withinLifeStage &
     theme(legend.position = "none",
-          plot.margin = unit(c(0, 0, 0, 30), "pt")) |
+          plot.margin = unit(c(0, 0, 0, 15), "pt")) |
     (correlationLegend)) + 
   patchwork::plot_layout(widths = c(1, 1, 0.45)) 
 
