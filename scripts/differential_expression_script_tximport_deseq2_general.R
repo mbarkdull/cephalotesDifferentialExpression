@@ -45,7 +45,7 @@ transcriptAbundances <- tximport(files = salmon_outputs,
                                  countsFromAbundance = "lengthScaledTPM")
 
 # Make a table of sample metadata, used to set up the contrasts in the differential expression analysis:
-sampleData <- read_sheet("https://docs.google.com/spreadsheets/d/1FEim9DwRUdOW5ZG0c6VzdkCdOIWDtCSekWrA_kN1AKk/edit?usp=sharing")
+sampleData <- readxl::read_xlsx("rnaSeqSampleData.xlsx")
 sampleData <- data.frame(sampleData, 
                          row.names = colnames(transcriptAbundances$counts))
 
@@ -181,9 +181,12 @@ plotPairwiseContrasts <- function(dataframe) {
                              padj > 0.05 ~ "p > 0.05"))
   
   # Make a color scheme
-  colorScheme <- c(`p <= 0.01` = "#06A77D",
-                   `p <= 0.05` = "#1378ed",
-                   `p > 0.05` = "#D5C67A")
+  #colorScheme <- c(`p <= 0.01` = "#06A77D",
+  #                 `p <= 0.05` = "#1378ed",
+  #                 `p > 0.05` = "#D5C67A")
+  colorScheme <- c(`p <= 0.01` = "#1167a8",
+                   `p <= 0.05` = "#91c1e6",
+                   `p > 0.05` = "#b6bdc2")
   
   # Get the range limits for the x-axis, which should be the most extreme large or small value of the fold-change, so that the axis can be symmetrical around zero. 
   xLimRange <- c(abs(min(filteredDataframe$log2FoldChange,
@@ -191,6 +194,12 @@ plotPairwiseContrasts <- function(dataframe) {
                  max(filteredDataframe$log2FoldChange,
                      na.rm = TRUE)) %>%
     max()
+  
+  plotTitle <- unique(dataframe$contrast) 
+  plotTitle <- gsub(pattern = " vs.",
+                    replacement = "\nvs.",
+                    plotTitle)
+    
   ggplot(data = filteredDataframe) +
     geom_point(mapping = aes(x = log2FoldChange, 
                              y = padj,
@@ -211,7 +220,7 @@ plotPairwiseContrasts <- function(dataframe) {
     #           colour = "#FFA500", 
     #           linetype = "dashed") + 
     scale_color_manual(values = colorScheme) +
-    labs(title = unique(dataframe$contrast), 
+    labs(title = plotTitle, 
          x = "Log<sub>2</sub> fold change", 
          y = "-log<sub>10</sub>(adjusted p-value)",
          color = "Signficance of\ndifferential expression") +
@@ -345,6 +354,10 @@ allFunctionInformation <- full_join(cvarToFunctionsLong,
 functionsDictionary <- full_join(transcriptsToGenes,
                                  allFunctionInformation,
                                  by = c("ID" = "cvar_proteins"))
+
+# Export the functions dictionary:
+write_csv(functionsDictionary,
+          file = "cvarGeneFunctions.csv")
 
 # Combine the functions with the differential expression results: 
 combineFunctionsWithResults <- function(resultsDataframe) {
@@ -555,9 +568,14 @@ differentialExpression$significantWithinMorph <- factor(differentialExpression$s
                                                         levels = c("Yes",
                                                                    "No"))
 
+# Add a column indicating Hippo genes:
+differentialExpression <- differentialExpression %>%
+  dplyr::mutate(hippo = case_when(gene_name %in% hippoGenes$gene_name ~ "Hippo",
+                                  TRUE ~ "notHippo"))
+
 # Make a color scheme
-colorScheme <- c(`Yes` = "#0B95A7",
-                 `No` = "#D5C67A")
+colorScheme <- c(`Yes` = "#1167a8",
+                 `No` = "#b6bdc2")
 
 # Contrasts within a single life stage, across castes:
 lifeStageCorrelation <- cor.test(formula = ~ `log2FoldChange_Pupal workers vs. pupal soldiers` + `log2FoldChange_Adult workers vs. adult soldiers`,
@@ -585,7 +603,7 @@ withinLifeStage <- ggplot(data = differentialExpression) +
   theme_bw() +
   theme(axis.title = element_text(size = 8),
         legend.title = element_text(size = 8)) + 
-  labs(color = 'Signficant in at\nleast one of the two contrasts') 
+  labs(color = 'Signficant in at\nleast one of the\ntwo contrasts?') 
 
 withinLifeStage
 
@@ -617,7 +635,7 @@ withinACaste <- ggplot(data = differentialExpression) +
   theme_bw() +
   theme(axis.title = element_text(size = 8),
         legend.title = element_text(size = 8)) + 
-  labs(color = 'Signficant in at\nleast one of the two contrasts') 
+  labs(color = 'Signficant in at\nleast one of the\ntwo contrasts?') 
 
 withinACaste
 
@@ -627,12 +645,14 @@ plotly::ggplotly(withinACaste)
 library(patchwork)
 
 # Combo method one:
-castePlots <- withinACaste / (allVolcanoes[[4]] + allVolcanoes[[3]]) + 
+castePlots <- withinACaste / ((allVolcanoes[[4]] + allVolcanoes[[3]]) &
+                                theme(plot.margin = unit(c(30, 0, 0, 0), "pt"))) + 
   patchwork::plot_layout(guides = "collect",
                          heights = c(2, 1)) +
   patchwork::plot_annotation("Gene expression within morphs across life stages")
 
-lifestagePlots <- withinLifeStage / (allVolcanoes[[2]] + allVolcanoes[[1]]) + 
+lifestagePlots <- withinLifeStage / ((allVolcanoes[[2]] + allVolcanoes[[1]]) &
+                                       theme(plot.margin = unit(c(30, 0, 0, 0), "pt")))+ 
   patchwork::plot_layout(guides = "collect",
                          heights = c(2, 1)) &
   patchwork::plot_annotation("Gene expression within life stages across morphs")
@@ -643,15 +663,42 @@ correlationLegend <- ggpubr::get_legend(withinACaste) %>%
 volcanoLegend <- ggpubr::get_legend(allVolcanoes[[1]]) %>%
   ggpubr::as_ggplot()
 
+# Plot combined:
 (castePlots &
-  theme(legend.position = "none") | lifestagePlots &
-  theme(legend.position = "none") |
+  theme(legend.position = "none",
+        plot.margin = unit(c(0, 30, 0, 0), "pt")) | lifestagePlots &
+  theme(legend.position = "none",
+        plot.margin = unit(c(0, 0, 0, 30), "pt")) |
   (correlationLegend / volcanoLegend)) + 
   patchwork::plot_layout(widths = c(1, 1, 0.45)) 
 
+# Save a png:
 ggsave("./images/logFoldScatterPlusVolcanoes.png", 
+       width = 24, 
+       height = 20*0.66, 
+       units = "cm", 
+       dpi = 1200)
+
+# Save an svg:
+ggsave("./images/logFoldScatterPlusVolcanoes.svg", 
        width = 30, 
        height = 20, 
+       units = "cm", 
+       dpi = 1200)
+
+# Plot only the correlation plots:
+(withinACaste &
+    theme(legend.position = "none",
+          plot.margin = unit(c(0, 30, 0, 0), "pt")) | withinLifeStage &
+    theme(legend.position = "none",
+          plot.margin = unit(c(0, 0, 0, 30), "pt")) |
+    (correlationLegend)) + 
+  patchwork::plot_layout(widths = c(1, 1, 0.45)) 
+
+# Save a png:
+ggsave("./images/logFoldScatter.png", 
+       width = 24, 
+       height = 15*0.66, 
        units = "cm", 
        dpi = 1200)
 

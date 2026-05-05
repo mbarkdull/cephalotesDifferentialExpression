@@ -32,7 +32,7 @@ differentialExpression$significantWithinMorph <- factor(differentialExpression$s
                                                         levels = c("Yes",
                                                                    "No"))
 
-# Get the list of Hippo genes:
+#### Get the list of Hippo genes: ####
 # List all of the Hippo pathway components from KEGG:
 hippoComponents <- "K04382/K04662/K21283/K06269/K06630/K16197/K04671/K05692/K05689/K16686/K04663/K16620/K16621/K02375/K04491/K19631/K09448/K04503/K10151/K10152/K16175/K04676/K00182/K00408/K00444/K00572/K08959/K08960/K04500/K06069/K18952"
 hippoComponents <- strsplit(hippoComponents, "/")[[1]]
@@ -47,13 +47,13 @@ checkHippoExpression <- function(ko) {
   hippoComponent <- keggAnnotations %>% 
     filter(str_detect(KEGG_ko, 
                       ko))
-  cvarGene <- hippoComponent$`#query`[1] %>%
+  hippoComponent$`#query` <- hippoComponent$`#query` %>%
     str_split_i(pattern = "-",
                 i = 1)
   allResultsCombined <- read_csv("./finalResults/allDifferentialExpressionResultsAndFunctions.csv")
-  expressionOfGene <- allResultsCombined %>% 
-    filter(str_detect(gene_name, 
-                      cvarGene))
+  expressionOfGene <- left_join(hippoComponent,
+                                allResultsCombined,
+                                by = c(`#query` = "gene_name"))
   return(expressionOfGene)
   
 }
@@ -61,11 +61,12 @@ possiblyCheckHippoExpression <- possibly(checkHippoExpression, otherwise = "erro
 
 hippoGenes <- purrr::map(hippoComponents,
                          possiblyCheckHippoExpression)
-hippoGenes <- as.data.frame(do.call(rbind, hippoGenes))
+hippoGenes <- as.data.frame(do.call(rbind, hippoGenes)) %>%
+  filter(contrast == "Pupal workers vs. pupal soldiers")
 
 # Add a column indicating Hippo genes in the differential expression data:
 differentialExpression <- differentialExpression %>%
-  dplyr::mutate(hippo = case_when(gene_name %in% hippoGenes$gene_name ~ "Yes",
+  dplyr::mutate(hippo = case_when(gene_name %in% hippoGenes$`#query` ~ "Yes",
                                   TRUE ~ "No"))
 
 differentialExpression$hippo <- factor(differentialExpression$hippo,
@@ -73,7 +74,7 @@ differentialExpression$hippo <- factor(differentialExpression$hippo,
                                                   "No"))
 
 # Make a color scheme
-colorScheme <- c(`Yes` = "#1167a8D1",
+colorScheme <- c(`Yes` = "#6985f5",
                  `No` = "#b6bdc280")
 
 # Contrasts within a single life stage, across castes:
@@ -90,13 +91,15 @@ withinLifeStage <- ggplot(data = differentialExpression) +
                            y = `log2FoldChange_Adult workers vs. adult soldiers`,
                            color = significantWithinLifeStage,
                            text = gene_name),
-             size = 0.75) +
+             size = 0.75,
+             pch = 16) +
   geom_point(data = filter(differentialExpression,
                            significantWithinLifeStage == "Yes"),
              mapping = aes(x = `log2FoldChange_Pupal workers vs. pupal soldiers`,
                            y = `log2FoldChange_Adult workers vs. adult soldiers`,
                            color = significantWithinLifeStage),
-             size = 0.75) +
+             size = 0.75,
+             pch = 16) +
   scale_color_manual(values = colorScheme) +
   labs(x = "Expression in worker pupae relative to soldier pupae",
        y = "Expression in worker adults relative to soldier adults") +
@@ -120,13 +123,15 @@ withinACaste <- ggplot(data = differentialExpression) +
                            y = `log2FoldChange_Adult workers vs. pupal workers`,
                            color = significantWithinMorph,
                            text = gene_name),
-             size = 0.75) +
+             size = 0.75,
+             pch = 16) +
   geom_point(data = filter(differentialExpression,
                            significantWithinMorph == "Yes"),
              mapping = aes(x = `log2FoldChange_Adult soldiers vs. pupal soldiers`,
                            y = `log2FoldChange_Adult workers vs. pupal workers`,
                            color = significantWithinMorph),
-             size = 0.75) +
+             size = 0.75,
+             pch = 16) +
   scale_color_manual(values = colorScheme) +
   labs(x = "Expression in soldier adults relative to soldier pupae",
        y = "Expression in worker adults relative to worker pupae") +
@@ -164,10 +169,15 @@ ggsave("./images/logFoldScatter.png",
 
 # Save an svg:
 ggsave("./images/logFoldScatter.svg", 
-       width = 30, 
-       height = 20, 
-       units = "cm", 
-       dpi = 1200)
+       width = 24, 
+       height = 15*0.66, 
+       units = "cm")
+
+# Save a pdf:
+ggsave("./images/logFoldScatter.pdf", 
+       width = 24, 
+       height = 15*0.66, 
+       units = "cm")
 
 #### Generate volcano plots: ####
 listOfContrasts <- colnames(differentialExpression) 
@@ -177,13 +187,28 @@ listOfContrasts <- str_replace(listOfContrasts,
                                replacement = "") %>%
   unique()
 
-plotPairwiseContrasts <- function(contrast) {
+plotPairwiseContrasts <- function(contrast,
+                                  hippo) {
   log2Column <- paste("log2FoldChange_",
                       contrast,
                       sep = "")
   padjColumn <- paste("padj_",
                       contrast,
                       sep = "")
+  
+  downContrast <- str_split_i(contrast,
+                              pattern = " vs. ",
+                              i = 1) %>%
+    tolower()
+  downContrast <- paste("upregulated in",
+                        downContrast)
+  
+  upContrast <- str_split_i(contrast,
+                            pattern = " vs. ",
+                            i = 2) %>%
+    tolower()
+  upContrast <- paste("upregulated in",
+                      upContrast)
   
   # Select only columns for the particular contrast:
   filteredDataframe <- differentialExpression %>%
@@ -203,19 +228,39 @@ plotPairwiseContrasts <- function(contrast) {
   
   # Add a column indicating the color for a gene, based on the adjusted p-value:
   filteredDataframe <- filteredDataframe %>% 
-    mutate(color = case_when(padj <= 0.01 & log2FoldChange <= 0 ~ "p ≤ 0.01, upregulated in pupal workers",
-                             padj <= 0.05 & log2FoldChange <= 0 ~ "p ≤ 0.05, upregulated in pupal workers",
+    mutate(color = case_when(padj <= 0.01 & log2FoldChange <= 0 ~ paste("p ≤ 0.01,",
+                                                                        downContrast),
+                             padj <= 0.05 & log2FoldChange <= 0 ~ paste("p ≤ 0.05,",
+                                                                        downContrast),
                              padj > 0.05 & log2FoldChange <= 0 ~ "p > 0.05",
-                             padj <= 0.01 & log2FoldChange > 0 ~ "p ≤ 0.01, upregulated in pupal soldiers",
-                             padj <= 0.05 & log2FoldChange > 0 ~ "p ≤ 0.05, upregulated in pupal soldiers",
+                             padj <= 0.01 & log2FoldChange > 0 ~ paste("p ≤ 0.01,",
+                                                                       upContrast),
+                             padj <= 0.05 & log2FoldChange > 0 ~ paste("p ≤ 0.05,",
+                                                                       upContrast),
                              padj > 0.05 & log2FoldChange > 0 ~ "p > 0.05"))
   
   # Make a color scheme
   significanceColorScheme <- c("p > 0.05" = "#e8e6e6",
-                               "p ≤ 0.05, upregulated in pupal workers" = "#a7cfc3",
-                               "p ≤ 0.05, upregulated in pupal soldiers" = "#edce8c",
-                               "p ≤ 0.01, upregulated in pupal workers" = "#00996e",
-                               "p ≤ 0.01, upregulated in pupal soldiers" = "#f0a000")
+                               "p ≤ 0.05, upregulated in pupal workers" = "#b5c781",
+                               "p ≤ 0.05, upregulated in pupal soldiers" = "#e8d697",
+                               "p ≤ 0.01, upregulated in pupal workers" = "#688a03",
+                               "p ≤ 0.01, upregulated in pupal soldiers" = "#d4a911")
+  
+  down05 <- (paste("p ≤ 0.05,", downContrast))
+  up05 <- (paste("p ≤ 0.05,", upContrast))
+  down01 <- (paste("p ≤ 0.01,", downContrast))
+  up01 <- (paste("p ≤ 0.01,", upContrast))
+  
+  significanceColorScheme <- c("#e8e6e6",
+                               "#b5c781",
+                               "#e8d697",
+                               "#688a03",
+                               "#d4a911")
+  names(significanceColorScheme) <- c("p > 0.05",
+                                      down05,
+                                      up05,
+                                      down01,
+                                      up01)
   
   # Get the range limits for the x-axis, which should be the most extreme large or small value of the fold-change, so that the axis can be symmetrical around zero. 
   xLimRange <- c(abs(min(filteredDataframe$log2FoldChange,
@@ -230,46 +275,75 @@ plotPairwiseContrasts <- function(contrast) {
                     plotTitle) %>%
     tolower()
   
-  ggplot() +
-    geom_point(data = filteredDataframe,
-               mapping = aes(x = log2FoldChange, 
-                             y = padj,
-                             color = color),
-               size = 0.5, 
-               alpha = 1) +
-    scale_color_manual(values = significanceColorScheme) +
-    
-    geom_point(data = filter(filteredDataframe,
-                             hippo == "Yes"),
-               mapping = aes(x = log2FoldChange, 
-                             y = padj,
-                             fill = color),
-               size = 1.5, 
-               alpha = 1,
-               pch = 21,
-               color = "black",
-               stroke = 1) +
-    scale_fill_manual(values = significanceColorScheme,
-                      guide="none") +
-    
-    scale_y_continuous(trans = compose_trans("log10", 
-                                             "reverse"),
-                       labels = label_log()) + 
-    xlim(floor(-xLimRange),
-         ceiling(xLimRange)) +
-    labs(title = paste("Gene expression in",
-                       tolower(contrast)), 
-         x = "Log<sub>2</sub> fold change", 
-         y = "-log<sub>10</sub>(adjusted p-value)",
-         color = "Signficance of differential expression") +
-    theme_bw() +
-    theme(axis.title = ggtext::element_markdown(size = 8),
-          plot.title = element_text(size = 9),
-          legend.title = element_text(size = 8)) + 
-    guides(colour = guide_legend(override.aes = list(size = 3)))
+  if (hippo == TRUE) {
+    ggplot() +
+      geom_point(data = filteredDataframe,
+                 mapping = aes(x = log2FoldChange, 
+                               y = padj,
+                               color = color),
+                 size = 0.5, 
+                 alpha = 1) +
+      scale_color_manual(values = significanceColorScheme) +
+      
+      geom_point(data = filter(filteredDataframe,
+                               hippo == "Yes"),
+                 mapping = aes(x = log2FoldChange, 
+                               y = padj,
+                               fill = color),
+                 size = 1, 
+                 alpha = 1,
+                 pch = 21,
+                 color = "black",
+                 stroke = 0.5) +
+      scale_fill_manual(values = significanceColorScheme,
+                        guide="none") +
+      
+      scale_y_continuous(trans = scales::compose_trans("log10", 
+                                                       "reverse"),
+                         labels = scales::label_log()) + 
+      xlim(floor(-xLimRange),
+           ceiling(xLimRange)) +
+      labs(title = paste("Gene expression in",
+                         tolower(contrast)), 
+           x = "Log<sub>2</sub> fold change", 
+           y = "-log<sub>10</sub>(adjusted p-value)",
+           color = "Signficance of differential expression") +
+      theme_bw() +
+      theme(axis.title = ggtext::element_markdown(size = 8),
+            plot.title = element_text(size = 9),
+            legend.title = element_text(size = 8)) + 
+      guides(colour = guide_legend(override.aes = list(size = 3)))
+  } else {
+    ggplot() +
+      geom_point(data = filteredDataframe,
+                 mapping = aes(x = log2FoldChange, 
+                               y = padj,
+                               color = color),
+                 size = 0.5, 
+                 alpha = 1) +
+      scale_color_manual(values = significanceColorScheme) +
+      scale_y_continuous(trans = scales::compose_trans("log10", 
+                                                       "reverse"),
+                         labels = scales::label_log()) + 
+      xlim(floor(-xLimRange),
+           ceiling(xLimRange)) +
+      labs(title = paste("Gene expression in",
+                         tolower(contrast)), 
+           x = "Log<sub>2</sub> fold change", 
+           y = "-log<sub>10</sub>(adjusted p-value)",
+           color = "Signficance of differential expression") +
+      theme_bw() +
+      theme(axis.title = ggtext::element_markdown(size = 8),
+            plot.title = element_text(size = 9),
+            legend.title = element_text(size = 8)) + 
+      guides(colour = guide_legend(override.aes = list(size = 3)))
+  }
+  
+  
 }
 
-pupaPlot <- plotPairwiseContrasts(contrast = "Pupal workers vs. pupal soldiers")
+pupaPlot <- plotPairwiseContrasts(contrast = "Pupal workers vs. pupal soldiers",
+                                  hippo = TRUE)
 
 pupaPlot
 
@@ -279,4 +353,55 @@ ggsave("./images/pupalVolcanoHippo.png",
        units = "in",
        dpi = 1200)
 
+ggsave("./images/pupalVolcanoHippo.pdf",
+       width = 7,
+       height = 3, 
+       units = "in",
+       dpi = 1200)
 
+adultPlot <- plotPairwiseContrasts(contrast = "Adult workers vs. adult soldiers",
+                                  hippo = FALSE)
+
+adultPlot
+
+volcanoPlots <- (pupaPlot + adultPlot) + 
+  patchwork::plot_layout(guides = "collect") 
+
+volcanoPlots
+
+# Write a function to make scales and axes consistent across plots: 
+makePlotsConsistent <- function(plot){
+  # Get the total number of plots that are combined together:
+  num_plots <- length(plot)
+  
+  # Fix x limits:
+  xLimits <- lapply(1:num_plots, function(x) ggplot_build(plot[[x]])$layout$panel_scales_x[[1]]$range$range)
+  # Get the minimum and maximum x values for each plot:
+  minX <- min(unlist(xLimits))
+  maxX <- max(unlist(xLimits))
+  xLimRange <- c(abs(minX), 
+                 maxX) %>%
+    max()
+  
+  # Fix y limits:
+  yLimits <- lapply(1:num_plots, function(x) ggplot_build(plot[[x]])$layout$panel_scales_y[[1]]$range$range)
+  # Get the minimum and maximum x values for each plot:
+  minY <- min(unlist(yLimits))
+  maxY <- max(unlist(yLimits))
+  
+  plot & 
+    xlim(-xLimRange - 0.01, 
+         xLimRange + 0.01) &
+    scale_y_continuous(trans = scales::compose_trans("log10", 
+                                             "reverse"),
+                       labels = scales::label_log()) 
+}
+
+volcanoPlots <- makePlotsConsistent(volcanoPlots)
+volcanoPlots
+
+ggsave("./images/morphVolcanoHippo.pdf",
+       width = 11,
+       height = 4, 
+       units = "in",
+       dpi = 1200)

@@ -84,6 +84,7 @@ doKeggEnrichment <- function(selectedContrast) {
 
 allKEGGs <- purrr::map(contrasts,
                        doKeggEnrichment)
+
 extractKEGGS <- function(index) {
   dataframe <- allKEGGs[[index]]@result
   dataframe$index <- index
@@ -98,11 +99,11 @@ keggDataframes$p.adjust <- as.numeric(keggDataframes$p.adjust)
 keggDataframes <- keggDataframes %>%
   filter(p.adjust <= 0.05) 
 
+# Check which KEGG subcategories are present in each contrast:
 ggplot(data = keggDataframes) + 
   geom_bar(mapping = aes(x = subcategory)) + 
   facet_wrap(~ contrast) + 
   theme(axis.text = element_text(angle = 90))
-
 
 repeatedKEGGpathways <- keggDataframes %>% 
   group_by(ID) %>% 
@@ -357,7 +358,6 @@ ggsave(filename = "./images/allMapPlotsPatchwork.png",
        units = "in")
 
 #### Generate a ridgeline plot: ####
-
 generateRidgelinePlot <- function(selectedContrast) {
   enrichment_kegg <- doKeggEnrichment(selectedContrast)
   
@@ -442,6 +442,7 @@ generateRidgelinePlot <- function(selectedContrast) {
     theme_bw() +
     labs(title = selectedContrast)
 }
+
 possiblyGenerateRidgelinePlot <- possibly(generateRidgelinePlot,
                                           otherwise = "error")
   
@@ -452,6 +453,7 @@ allRidgelinePlotsPatchwork <- patchwork::wrap_plots(listOfRidgelinePlots,
                                                     ncol = 2) + 
   patchwork::plot_annotation(title = 'Enriched KEGG pathways across differential expression contrasts',
                              theme = theme(plot.title = element_text(size = 19))) 
+
 plot(allRidgelinePlotsPatchwork)
 
 # Plot results together:
@@ -518,14 +520,42 @@ keggTermFiles <- list.files(path = "./finalResults",
                             full.names = TRUE)
 
 keggTermResults <- read_csv(keggTermFiles,
-                            id = "contrast") %>%
+                            id = "filename") %>%
   dplyr::filter(category != "Human Diseases") %>%
   distinct()
 
-numberPupae <- length(which(keggTermResults$contrast == "./finalResults/WorkerPupaeVsSoldierPupae_EnrichmentKEGGResults.csv"))
-numberAdults <- length(which(keggTermResults$contrast == "./finalResults/AdultWorkersVsAdultSoldiers_EnrichmentKEGGResults.csv"))
-numberSoldiers <- length(which(keggTermResults$contrast == "./finalResults/AdultSoldiersVsSoldierPupae_EnrichmentKEGGResults.csv"))
-numberWorkers <- length(which(keggTermResults$contrast == "./finalResults/AdultWorkersVsWorkerPupae_EnrichmentKEGGResults.csv"))
+numberPupae <- length(which(keggTermResults$filename == "./finalResults/PupalWorkersVsPupalSoldiers_EnrichmentKEGGResults.csv"))
+numberAdults <- length(which(keggTermResults$filename == "./finalResults/AdultWorkersVsAdultSoldiers_EnrichmentKEGGResults.csv"))
+numberSoldiers <- length(which(keggTermResults$filename == "./finalResults/AdultSoldiersVsPupalSoldiers_EnrichmentKEGGResults.csv"))
+numberWorkers <- length(which(keggTermResults$filename == "./finalResults/AdultWorkersVsPupalWorkers_EnrichmentKEGGResults.csv"))
+
+# Generate a nice table for the publication:
+library(gt)
+keggTermTable <- keggTermResults %>%
+  select(-c("filename",
+            "...1",
+            "geneID",
+            "RichFactor",
+            "Count",
+            "zScore",
+            "pvalue",
+            "geneRatioDecimal")) %>%
+  dplyr::arrange("p.adjust")
+colnames(keggTermTable) <- c("KEGG category",
+                             "KEGG subcategory",
+                             "KEGG ID",
+                             "Description",
+                             "Ratio of differentially expressed genes",
+                             "Ratio in all genes",
+                             "Fold enrichment",
+                             "Adjusted p-value",
+                             "Adjusted q-value",
+                             "contrast")
+keggTermTable <- gt(keggTermTable,
+                    groupname_col = "contrast")
+
+gtsave(keggTermTable, 
+       filename = "./finalResults/enrichedKEGGterms.docx")
 
 #### Explore specific pathways: ####
 # List all of the Hippo pathway components from KEGG:
@@ -539,6 +569,8 @@ keggAnnotations <- read_delim("./04_keggAnnotations/results/keggAnnotations.emap
   filter(!is.na(seed_ortholog))
 
 checkHippoExpression <- function(ko) {
+  print(paste("Checking expression of",
+              ko))
   hippoComponent <- keggAnnotations %>% 
     filter(str_detect(KEGG_ko, 
                       ko))
@@ -548,8 +580,7 @@ checkHippoExpression <- function(ko) {
   allResultsCombined <- read_csv("./finalResults/allDifferentialExpressionResultsAndFunctions.csv")
   expressionOfGene <- allResultsCombined %>% 
     filter(str_detect(gene_name, 
-                      cvarGene) &
-             contrast == "Worker pupae vs. soldier pupae")
+                      cvarGene))
   return(expressionOfGene)
   
 }
@@ -621,112 +652,3 @@ uniqueHippoGenes <- hippoGenes %>%
             "gene_name.y",
             "pValue")) %>%
   distinct()
-
-
-
-
-
-
-
-
-
-test <- doKeggEnrichment("Worker pupae vs. soldier pupae")
-test2 <- test@result
-
-# List all of the Hippo pathway components from KEGG:
-dopaminergicComponents <- "K07882/K07299/K07593/K04131/K01539/K18211/K04632/K02677/K19662/K19663/K04936/K12407/K04634/K04635/K04526/K08049/K01540"
-dopaminergicComponents <- strsplit(dopaminergicComponents, "/")[[1]]
-
-# Write a function to find and extract matching genes from the differential expression results:
-keggAnnotations <- read_delim("./04_keggAnnotations/results/keggAnnotations.emapper.annotations",
-                              delim = "\t",
-                              skip = 4) %>%
-  filter(!is.na(seed_ortholog))
-
-checkHippoExpression <- function(ko) {
-  hippoComponent <- keggAnnotations %>% 
-    filter(str_detect(KEGG_ko, 
-                      ko))
-  cvarGene <- hippoComponent$`#query`[1] %>%
-    str_split_i(pattern = "-",
-                i = 1)
-  allResultsCombined <- read_csv("./finalResults/allDifferentialExpressionResultsAndFunctions.csv")
-  expressionOfGene <- allResultsCombined %>% 
-    filter(str_detect(gene_name, 
-                      cvarGene) &
-             contrast == "Worker pupae vs. soldier pupae")
-  return(expressionOfGene)
-  
-}
-possiblyCheckHippoExpression <- possibly(checkHippoExpression, otherwise = "error")
-
-dopaGenes <- purrr::map(dopaminergicComponents,
-                         possiblyCheckHippoExpression)
-dopaGenes <- as.data.frame(do.call(rbind, dopaGenes))
-
-# Add in Hyphy results:
-hyphyResults <- read_tsv("./hyphyResultsForDE.tsv")
-hyphyResults$HOGmembers <- gsub(pattern = "_R.*$",
-                                replacement = "",
-                                x = hyphyResults$HOGmembers)
-dopaGenes <- left_join(dopaGenes,
-                        hyphyResults,
-                        by = c("gene_name" = "HOGmembers"))
-
-getTextSelectiveRegimes <- function(dataframe) {
-  dataframe <- dataframe %>% mutate(positiveSelectionOn =
-                                      case_when(as.numeric(as.character(testPvalueFDR)) <= 0.05 & 
-                                                  as.numeric(as.character(backgroundPvalueFDR)) > 0.05 &
-                                                  as.numeric(as.character(differencePvalueFDR)) <= 0.05 ~ "ForegroundOnly",
-                                                
-                                                as.numeric(as.character(testPvalueFDR)) <= 0.05 & 
-                                                  as.numeric(as.character(backgroundPvalueFDR)) <= 0.05 &
-                                                  as.numeric(as.character(differencePvalueFDR)) <= 0.05 ~ "SelectionOnBothButDifferent",
-                                                
-                                                as.numeric(as.character(testPvalueFDR)) <= 0.05 & 
-                                                  as.numeric(as.character(backgroundPvalueFDR)) <= 0.05 &
-                                                  as.numeric(as.character(differencePvalueFDR)) > 0.05 ~ "SelectionOnBothButNoSignificantDifference",
-                                                
-                                                as.numeric(as.character(testPvalueFDR)) <= 0.05 & 
-                                                  as.numeric(as.character(backgroundPvalueFDR)) > 0.05 &
-                                                  as.numeric(as.character(differencePvalueFDR)) > 0.05 ~ "EvidenceOfSelectionAssociatedWithTraitButNS",
-                                                
-                                                as.numeric(as.character(testPvalueFDR)) > 0.05 & 
-                                                  as.numeric(as.character(backgroundPvalueFDR)) <= 0.05 &
-                                                  as.numeric(as.character(differencePvalueFDR)) <= 0.05 ~ "BackgroundOnly",
-                                                
-                                                as.numeric(as.character(testPvalueFDR)) > 0.05 & 
-                                                  as.numeric(as.character(backgroundPvalueFDR)) <= 0.05 &
-                                                  as.numeric(as.character(differencePvalueFDR)) > 0.05 ~ "EvidenceOfSelectionAssociatedWithLackOfTraitButNS",
-                                                
-                                                as.numeric(as.character(testPvalueFDR)) > 0.05 & 
-                                                  as.numeric(as.character(backgroundPvalueFDR)) > 0.05 &
-                                                  as.numeric(as.character(differencePvalueFDR)) <= 0.05 ~ "NoEvidenceOfSelection",
-                                                
-                                                as.numeric(as.character(testPvalueFDR)) > 0.05 & 
-                                                  as.numeric(as.character(backgroundPvalueFDR)) > 0.05 &
-                                                  as.numeric(as.character(differencePvalueFDR)) > 0.05 ~ "NoEvidenceOfSelection"))
-  dataframe <- dataframe %>%
-    mutate(selectiveIntensity = case_when(pValueFDR < 0.05 & kValue < 1 ~ "selectionRelaxed",
-                                          pValueFDR < 0.05 & kValue > 1 ~ "selectionIntensified",
-                                          pValueFDR >= 0.05 ~ "noShift"))
-  return(dataframe)
-}
-
-dopaGenes <- getTextSelectiveRegimes(dopaGenes)
-
-
-uniqueDopaGenes <- dopaGenes %>%
-  select(-c("seq.name",
-            "inputFile.x",
-            "testPvalue",
-            "backgroundPvalue",
-            "differencePvalue",
-            "inputFile.y",
-            "gene_name.y",
-            "pValue")) %>%
-  distinct()
-
-
-ggplot(data = uniqueDopaGenes) +
-  geom_bar(mapping = aes(x = positiveSelectionOn))
